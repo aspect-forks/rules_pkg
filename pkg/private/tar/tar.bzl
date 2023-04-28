@@ -13,6 +13,7 @@
 # limitations under the License.
 """Rules for making .tar files."""
 
+load("@aspect_bazel_lib//lib:glob_match.bzl", "glob_match")
 load("//pkg:path.bzl", "compute_data_path", "dest_path")
 load("//pkg:providers.bzl", "PackageArtifactInfo", "PackageVariablesInfo")
 load(
@@ -199,7 +200,14 @@ def _pkg_tar_impl(ctx):
 
     manifest_file = ctx.actions.declare_file(ctx.label.name + ".manifest")
     files.append(manifest_file)
-    write_manifest(ctx, manifest_file, content_map)
+    include = lambda x : True
+    exclude = lambda x : False
+    if len(ctx.attr.includes):
+        include = lambda x : any([glob_match(expr, x) for expr in ctx.attr.includes])
+    if len(ctx.attr.excludes):
+        exclude = lambda x : any([glob_match(expr, x) for expr in ctx.attr.excludes])
+    
+    write_manifest(ctx, manifest_file, content_map, include = include, exclude = exclude)
     args.add("--manifest", manifest_file.path)
 
     args.set_param_file_format("flag_per_line")
@@ -270,7 +278,8 @@ pkg_tar_impl = rule(
         "remap_paths": attr.string_dict(),
         "compressor": attr.label(executable = True, cfg = "exec"),
         "compressor_args": attr.string(),
-
+        "includes": attr.string_list(doc = "glob expressions of files to include"),
+        "excludes": attr.string_list(doc = "glob expressions of files to exclude, used only if includes is empty"),
         # Common attributes
         "out": attr.output(mandatory = True),
         "package_file_name": attr.string(doc = "See Common Attributes"),

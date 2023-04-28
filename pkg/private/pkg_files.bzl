@@ -477,7 +477,7 @@ def add_tree_artifact(content_map, dest_path, src, origin, mode = None, user = N
         group = group,
     )
 
-def write_manifest(ctx, manifest_file, content_map, use_short_path=False, pretty_print=False):
+def write_manifest(ctx, manifest_file, content_map, use_short_path=False, pretty_print=False, include=lambda x: True, exclude=lambda x : False):
     """Write a content map to a manifest file.
 
     The format of this file is currently undocumented, as it is a private
@@ -491,6 +491,8 @@ def write_manifest(ctx, manifest_file, content_map, use_short_path=False, pretty
       manifest_file: File object used as the output destination
       content_map: content_map (see concepts at top of file)
       use_short_path: write out the manifest file destinations in terms of "short" paths, suitable for `bazel run`.
+      include: predicate for whether to include a filename
+      exclude: predicate for whether to exclude a filename
     """
     ctx.actions.write(
         manifest_file,
@@ -498,6 +500,7 @@ def write_manifest(ctx, manifest_file, content_map, use_short_path=False, pretty
             [
                 _encode_manifest_entry(dst, content_map[dst], use_short_path, pretty_print)
                 for dst in sorted(content_map.keys())
+                if include(dst) and not exclude(dst)
             ]
         ) + "\n]\n"
     )

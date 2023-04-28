@@ -13,6 +13,7 @@
 # limitations under the License.
 """Zip archive creation rule and associated logic."""
 
+load("@aspect_bazel_lib//lib:glob_match.bzl", "glob_match")
 load("//pkg:path.bzl", "compute_data_path", "dest_path")
 load(
     "//pkg:providers.bzl",
@@ -55,7 +56,14 @@ def _pkg_zip_impl(ctx):
 
     manifest_file = ctx.actions.declare_file(ctx.label.name + ".manifest")
     inputs.append(manifest_file)
-    write_manifest(ctx, manifest_file, content_map)
+    include = lambda x : True
+    exclude = lambda x : False
+    if len(ctx.attr.includes):
+        include = lambda x : any([glob_match(expr, x) for expr in ctx.attr.includes])
+    if len(ctx.attr.excludes):
+        exclude = lambda x : any([glob_match(expr, x) for expr in ctx.attr.excludes])
+    
+    write_manifest(ctx, manifest_file, content_map, include = include, exclude = exclude)
     args.add("--manifest", manifest_file.path)
     args.set_param_file_format("multiline")
     args.use_param_file("@%s")
@@ -115,6 +123,8 @@ Jan 1, 1980 will be rounded up and the precision in the zip file is
 limited to a granularity of 2 seconds.""",
             default = 315532800,
         ),
+        "includes": attr.string_list(doc = "glob expressions of files to include"),
+        "excludes": attr.string_list(doc = "glob expressions of files to exclude, used only if includes is empty"),
 
         # Common attributes
         "out": attr.output(
